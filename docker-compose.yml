@@ -1,0 +1,92 @@
+version: '3'
+
+services:
+  nodejs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nodejs
+    container_name: nodejs
+    restart: unless-stopped
+    environment:
+      - MONGO_USERNAME= mongouser
+      - MONGO_PASSWORD= 12345
+      - MONGO_HOSTNAME= mongohost
+      - MONGO_PORT= 27017
+      - MONGO_DB= backend_demo
+    ports:
+      - "80:8080"
+    volumes:
+      - .:/home/node/app
+      - node_modules:/home/node/app/node_modules
+    networks:
+      - app-network
+
+  mysqldb:
+    image: mysql:5.7
+    volumes:
+    - mysql_storage:/var/lib/mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD= 12345
+      - MYSQL_USER= root
+      - MYSQL_PASSWORD= 12345
+      - MYSQL_DATABASE= backend_demo
+    networks:
+      - app-network
+
+  mongoDB:
+    image: mongo:4.1.8-xenial
+    container_name: mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME= mongouser
+      - MONGO_INITDB_ROOT_PASSWORD= 12345
+    volumes:
+      - dbdata:/data/mongodb
+    networks:
+      - app-network
+   
+  webserver:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - web-root:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+    depends_on:
+      - nodejs
+    networks:
+      - app-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    depends_on:
+      - webserver
+    command: certonly --webroot --webroot-path=/var/www/html --email sachin@example.com --agree-tos --no-eff-email --staging -d example.com  -d www.example.com
+
+volumes:
+  certbot-etc:
+  certbot-var:
+  web-root:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/rnt/Downloads/BackendDemoProject/volumes/
+      o: bind
+  dbdata :
+  mysql_storage :
+  node_modules :
+
+networks:
+  app-network:
+    driver: bridge
